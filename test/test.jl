@@ -13,16 +13,15 @@ using LinearAlgebra
         site=[3, 3], Δt=0.1, BatchSize=10, Initial="V")
 
     s = Initial_s(model, rng)
-    println((model.nodes))
+    # println((model.nodes))
 
-    s = phy_update(path, model, s, 10, true)
+    # s = phy_update(path, model, s, 10, true)
 
 
-    # L = model.site[2]
-    # indexA = area_index(model.Lattice, model.site, ([1, 1], [div(L, 3), L]))
-    # # # HalfHalf
-    # indexB = area_index(model.Lattice, model.site, ([1, 1], [div(L, 3), div(2 * L, 3)]))
-    # # println(indexB)
+    L = model.site[2]
+    indexA = area_index(model.Lattice, model.site, ([1, 1], [div(L, 3), L]))
+
+    EE_update(path, model, indexA, 1, [copy(s), copy(s)], true)
 
     # λ = 0.5
     # Nλ = 2

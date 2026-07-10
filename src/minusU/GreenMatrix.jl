@@ -18,9 +18,7 @@ function BM_F!(tmpN, tmpNN, BM, model, s::Array{UInt8,2}, idx::Int64)
         BM[i] = 1
     end
     for lt in model.nodes[idx]+1:model.nodes[idx+1]
-        @inbounds @simd for i in 1:model.Ns
-            tmpN[i] = model.exp_αη_pos[lt, s[i, lt]]
-        end
+        tmpN .= model.exp_αη_pos[lt, s[:, lt]]
         mul!(tmpNN, model.eK, BM)
         mul!(BM, Diagonal(tmpN), tmpNN)
     end
@@ -48,34 +46,61 @@ function BMinv_F!(tmpN, tmpNN, BM, model, s::Array{UInt8,2}, idx::Int64)
 end
 
 
-function WrapKV!(tmpNN, eK, eKinv, D, G, direction, LR)
+function WrapKV!(tmpN, eK, eKinv, D, G, direction, LR)
     if direction == "Forward"
         if LR == "L"
-            mul!(tmpNN, eK, G)
-            mul!(G, Diagonal(D), tmpNN)
-        elseif LR == "R"
-            mul!(tmpNN, G, eKinv)
-            mul!(G, tmpNN, Diagonal(D))
-        elseif LR == "B"
-            mul!(tmpNN, eK, G)
-            mul!(G, tmpNN, eKinv)
-            mul!(tmpNN, Diagonal(D), G)
+            mul!(tmpN, eKinv, G)
             D .= 1 ./ D
-            mul!(G, tmpNN, Diagonal(D))
+            mul!(G, Diagonal(D), tmpN)
+        elseif LR == "R"
+            mul!(tmpN, eK, G)
+            mul!(G, Diagonal(D), tmpN)
+        else
+            error("WrapKV! LR must be L or R")
         end
     elseif direction == "Backward"
         if LR == "L"
-            mul!(tmpNN, Diagonal(D), G)
-            mul!(G, eKinv, tmpNN)
+            mul!(tmpN, Diagonal(D), G)
+            mul!(G, eK, tmpN)
         elseif LR == "R"
-            mul!(tmpNN, G, Diagonal(D))
-            mul!(G, tmpNN, eK)
-        elseif LR == "B"
-            mul!(tmpNN, Diagonal(D), G)
+            mul!(tmpN, eKinv, G)
             D .= 1 ./ D
-            mul!(G, tmpNN, Diagonal(D))
-            mul!(tmpNN, eKinv, G)
-            mul!(G, tmpNN, eK)
+            mul!(G, Diagonal(D), tmpN)
+        else
+            error("WrapKV! LR must be L or R")
         end
     end
 end
+
+# --------------------------------------------------------------------
+
+function LRt(t, model, s)
+    L = copy(model.Pt)
+    R = copy(model.Pt)
+
+    eV = zeros(model.Ns, model.Ns)
+
+    count = 0
+    for i in 1:t
+        eV[diagind(eV)] .= model.exp_αη_pos[i, s[:, i]]
+        R = eV * model.eK * R
+        count += 1
+        if count == 5
+            R ./= norm(R)
+            count = 0
+        end
+    end
+
+    count = 0
+    for i in model.Nt:-1:t+1
+        eV[diagind(eV)] .= model.exp_αη_pos[i, s[:, i]]
+        L = model.eK * eV * L
+        count += 1
+        if count == 5
+            L ./= norm(L)
+            count = 0
+        end
+    end
+    return L / norm(L), R / norm(R)
+end
+

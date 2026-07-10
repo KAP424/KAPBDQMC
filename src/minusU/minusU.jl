@@ -1,11 +1,11 @@
 module minusU
-import ..KAPBDQMC: phy_update, Initial_s, get_F!
+import ..KAPBDQMC: phy_update, Initial_s, get_F!, EE_update
 # , ctrl_SCEEicr, ctrl_SCDOPicr, ctrl_EEicr
 
-using ..KAPBDQMC: name_Lattice, nn2idx, xy_i, i_xy, nnK_Matrix, area_index, nnidx_F
+using ..KAPBDQMC: name_Lattice, idxbar_F, EE_cal,
+    nn2idx, xy_i, i_xy, nnK_Matrix, area_index, nnidx_F
 # , Initial_Pt!
-using ..KAPBDQMC: PhyBuffer_
-# , G4Buffer_, SCEEBuffer_, AreaBuffer_, DOPBuffer_
+using ..KAPBDQMC: PhyBuffer_, G4Buffer_, SCEEBuffer_
 # using ..KAPBDQMC: inv22!, GroverMatrix, GroverMatrix!
 
 using LinearAlgebra, LinearAlgebra.BLAS, LinearAlgebra.LAPACK

@@ -32,7 +32,7 @@ function phy_update(path::String, model, s::Array{UInt8,2}, Sweeps::Int64, recor
     end
 
     idx = 1
-    get_F!(model.Nb, view(PLs, :, :, idx), view(PRs, :, :, idx), F)
+    get_F!(model.Nb, view(PLs, :, idx), view(PRs, :, idx), F)
     for _ in 1:Sweeps
         for lt in 1:model.Nt
             @inbounds @simd for iii in 1:Ns

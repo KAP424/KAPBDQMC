@@ -126,6 +126,7 @@ function G4Buffer(Ns, NN)
         Vector{Float64}(undef, Ns),
         Vector{Float64}(undef, Ns),
         Vector{Float64}(undef, Ns),
+        Vector{Float64}(undef, Ns),
         Matrix{Float64}(undef, Ns, Ns),
         Matrix{Float64}(undef, Ns, NN),
         Matrix{Float64}(undef, Ns, NN),
@@ -133,20 +134,11 @@ function G4Buffer(Ns, NN)
     )
 end
 
-
-A = rand(10, 10) + 1im * rand(10, 10)
-a = rand(10) + 1im * rand(10)
-result = rand(10) * 1im
-norm(A * a - mul!(result, A, a))
-norm((a'*A)[:] - mul!(result, A', a)'[:])
-
-result1 = rand(10) * 1im
-result2 = rand(10) * 1im
-mul!(result2, A, a)
-mul!(result1, A', a)
-a' * A * A * a - dot(result1, result2)
-
-(a'*A)[:]
-
-
-mul!(result, A', a)
+function SCEEBuffer(Ns)
+    return SCEEBuffer_{Float64}(
+        Vector{Float64}(undef, Ns),
+        Vector{Float64}(undef, Ns),
+        Vector{Float64}(undef, Ns),
+        Matrix{Float64}(undef, Ns, Ns)
+    )
+end

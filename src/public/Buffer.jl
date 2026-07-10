@@ -9,8 +9,6 @@ mutable struct PhyBuffer_{T<:Number}
     tmpNN::Matrix{T}
 end
 
-mod1(10, 2)
-
 mutable struct G4Buffer_{T<:Number}
     BMs::Array{T,3}
     Lt::Vector{T}
@@ -26,9 +24,9 @@ mutable struct G4Buffer_{T<:Number}
 
 end
 
-mutable struct EEBuffer_{T<:Number}
+mutable struct SCEEBuffer_{T<:Number}
+    D::Vector{T}
+    D_::Vector{T}
     N::Vector{T}
-    N_::Vector{T}
     NN::Matrix{T}
-
 end
