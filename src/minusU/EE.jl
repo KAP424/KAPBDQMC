@@ -1,4 +1,12 @@
 function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss::Vector{Matrix{UInt8}}, record)
+    name = name_Lattice(model.Lattice)
+    global LOCK = ReentrantLock()
+    if model.Θquench == 0.0
+        file = "$(path)/minusUEE$(name)_t$(model.Ht)U$(model.Hu1)size$(model.site)Δt$(model.Δt)Θ$(model.Θrelax).csv"
+    else
+        file = "$(path)/minusUEE$(name)_t$(model.Ht)U$(model.Hu1)_$(model.Hu2)size$(model.site)Δt$(model.Δt)Θ$(model.Θrelax)_$(model.Θquench).csv"
+    end
+
     rng = MersenneTwister(Threads.threadid() + time_ns())
     TTT = time_ns()
     Ns = model.Ns
@@ -74,8 +82,8 @@ function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss
         G2.R0 .= G2.Rs[:, Θidx]
 
         for lt in 1:model.Nt
-            D .= model.exp_αη_pos[lt, ss[1][:, lt]]
-            D_ .= model.exp_αη_pos[lt, ss[2][:, lt]]
+            D .= @view model.exp_αη_pos[lt, view(ss[1], :, lt)]
+            D_ .= @view model.exp_αη_pos[lt, view(ss[2], :, lt)]
 
             WrapKV!(tmpN, model.eK, model.eKinv, D, G1.Rt, "Forward", "R")
             WrapKV!(tmpN, model.eK, model.eKinv, D_, G2.Rt, "Forward", "R")
@@ -100,7 +108,7 @@ function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss
             # end
             ##############################################################
 
-            tmpO += EE_cal(model.Nb, G1.L0, G2.L0, G1.R0, G2.R0, indexA, indexAbar)
+            tmpO += EE_cal(model.binoms_sq, G1.L0, G2.L0, G1.R0, G2.R0, indexA, indexAbar)
             counter += 1
 
             if any(model.nodes .== lt)
@@ -133,7 +141,7 @@ function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss
                 end
             end
         end
-        println("inverse update")
+
         for lt in model.Nt:-1:1
             UpdateEELayer!(lt < lθ, rng, view(ss[1], :, lt), view(ss[2], :, lt), lt, G1, G2, model, UPD)
 
@@ -153,7 +161,7 @@ function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss
             # end
             ##############################################################
 
-            tmpO += EE_cal(model.Nb, G1.L0, G2.L0, G1.R0, G2.R0, indexA, indexAbar)
+            tmpO += EE_cal(model.binoms_sq, G1.L0, G2.L0, G1.R0, G2.R0, indexA, indexAbar)
             counter += 1
 
             if any(model.nodes .== (lt - 1))
@@ -186,10 +194,8 @@ function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss
                     # G2.Bt0s[:, :, idx] = G2.Bt0s[:, :, idx+1] * G2.BMs[:, :, idx]
                 end
             else
-                @inbounds @simd for iii in 1:Ns
-                    @fastmath D[iii] = model.exp_αη_pos[lt, ss[1][iii, lt]]
-                    @fastmath D_[iii] = model.exp_αη_pos[lt, ss[2][iii, lt]]
-                end
+                D .= @view model.exp_αη_pos[lt, view(ss[1], :, lt)]
+                D_ .= @view model.exp_αη_pos[lt, view(ss[2], :, lt)]
 
                 WrapKV!(tmpN, model.eK, model.eKinv, D, G1.Lt, "Backward", "L")
                 WrapKV!(tmpN, model.eK, model.eKinv, D_, G2.Lt, "Backward", "L")
@@ -200,30 +206,44 @@ function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss
 
         end
 
+        if record
+            lock(LOCK) do
+                open(file, "a") do io
+                    writedlm(io, tmpO / counter, ',')
+                end
+            end
+        end
         # 输出 O
-        O = tmpO / counter
         tmpO = 0.0
         counter = 0
-
     end
-    println("EE_update done, time: ", (time_ns() - TTT) / 1e9, " s")
-    println("Acceptance rate: ", UPD.acc / (Sweeps * model.Nt * model.Ns) / 4)
+    TTT = round(Int, (time_ns() - TTT) / 1e9)
+    hour = TTT ÷ 3600
+    minite = (TTT % 3600) ÷ 60
+    second = TTT % 60
+    println("      acc = ", round(100 * UPD.acc / prod(size(ss[1])) / Sweeps / 4, digits=2), "%", "  $(Sweeps) Sweep finished in ", string(lpad(string(hour), 2, '0'), ":", lpad(string(minite), 2, '0'), ":", lpad(string(second), 2, '0')))
 end
 
 function UpdateEELayer!(tless0, rng, s1, s2, lt, G1, G2, model, UPD)
+    LR1 = dot(G1.Lt, G1.Rt)
+    LR2 = dot(G2.Lt, G2.Rt)
+
     for i in axes(s1, 1)
         begin
-            sx = rand(rng, model.samplers_dict[s1[i]])
+            sx = rand(rng, model.samplers_vec[s1[i]])
             UPD.Δ = exp(model.αη[lt, sx] - model.αη[lt, s1[i]]) - 1
-            UPD.r = 1 + (G1.Lt[i] * UPD.Δ * G1.Rt[i] / dot(G1.Lt, G1.Rt))^model.Nb
+            UPD.r = abs2(1 + G1.Lt[i] * UPD.Δ * G1.Rt[i] / dot(G1.Lt, G1.Rt))^model.Nb
             p = UPD.r * model.γ[sx] / model.γ[s1[i]]
 
+            # if p < 0
+            #     println("warnin for negative p:  ", p)
+            # end
             if rand(rng) < p
                 s1[i] = sx
                 UPD.acc += 1
                 G1.Rt[i] += UPD.Δ * G1.Rt[i]
+                LR1 = dot(G1.Lt, G1.Rt)
                 # update L0 R0
-
                 if tless0
                     G1.R0 .+= UPD.Δ .* G1.Rt[i] .* G1.Bt0[:, i]
                 else
@@ -233,11 +253,13 @@ function UpdateEELayer!(tless0, rng, s1, s2, lt, G1, G2, model, UPD)
         end
 
         begin
-            sx = rand(rng, model.samplers_dict[s2[i]])
+            sx = rand(rng, model.samplers_vec[s2[i]])
             UPD.Δ = exp(model.αη[lt, sx] - model.αη[lt, s2[i]]) - 1
-            UPD.r = 1 + (G2.Lt[i] * UPD.Δ * G2.Rt[i] / dot(G2.Lt, G2.Rt))^model.Nb
+            UPD.r = abs2(1 + G2.Lt[i] * UPD.Δ * G2.Rt[i] / dot(G2.Lt, G2.Rt))^model.Nb
             p = UPD.r * model.γ[sx] / model.γ[s2[i]]
-
+            # if p < 0
+            #     println("warnin for negative p:  ", p)
+            # end
             if rand(rng) < p
                 s2[i] = sx
                 UPD.acc += 1

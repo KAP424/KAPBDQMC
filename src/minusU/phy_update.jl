@@ -116,7 +116,7 @@ end
 
 function UpdatePhyLayer!(rng, s, lt, model, UPD, Phy::PhyBuffer_)
     for i in eachindex(s)
-        sx = rand(rng, model.samplers_dict[s[i]])
+        sx = rand(rng, model.samplers_vec[s[i]])
         UPD.Δ = exp(model.αη[lt, sx] - model.αη[lt, s[i]]) - 1
         UPD.r = 1 + UPD.Δ / model.Ns * Phy.F[i, i]
         p = UPD.r * model.γ[sx] / model.γ[s[i]]

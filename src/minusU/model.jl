@@ -26,12 +26,13 @@ struct Model_Para_
     HalfeKinv::Array{Float64,2}
     eKinv::Array{Float64,2}
     nodes::Vector{Int64}
-    samplers_dict::Dict{UInt8,Random.Sampler}
+    samplers_vec::Vector{Random.Sampler}
+    binoms_sq::Vector{Float64}
     # flux::Float64
 end
 
 
-function Model_Para(; Nb, Ht, Hu1, Hu2, Δt, Θrelax, Θquench, Lattice::String, site, BatchSize, Initial::String)
+function Model_Para(; nb, Ht, Hu1, Hu2, Δt, Θrelax, Θquench, Lattice::String, site, BatchSize, Initial::String)
     # flux=0.0, opt="xy"
     Nt = round(Int, 2 * (Θrelax + Θquench) / Δt)
     if (Θquench > 0.0) & (abs(Hu1 - Hu2) > 0)
@@ -59,6 +60,7 @@ function Model_Para(; Nb, Ht, Hu1, Hu2, Δt, Θrelax, Θquench, Lattice::String,
 
     K = nnK_Matrix(Lattice, site)
     Ns = size(K, 1)
+    Nb = Int(nb * Ns)
 
     E, V = LAPACK.syevd!('V', 'L', Ht * K[:, :])
     if abs(E[div(Ns, 2)] - E[div(Ns, 2)+1]) > 1e-10
@@ -79,18 +81,19 @@ function Model_Para(; Nb, Ht, Hu1, Hu2, Δt, Θrelax, Θquench, Lattice::String,
     end
 
     rng = MersenneTwister(Threads.threadid() + time_ns())
-    elements = (1, 2, 3, 4)
-    samplers_dict = Dict{UInt8,Random.Sampler}()
-    for excluded in elements
-        allowed = [i for i in elements if i != excluded]
-        samplers_dict[excluded] = Random.Sampler(rng, allowed)
+    samplers_vec = Vector{Random.Sampler}(undef, 4)
+    for excluded in 1:4
+        allowed = [i for i in 1:4 if i != excluded]
+        samplers_vec[excluded] = Random.Sampler(rng, allowed)
     end
 
     println("$(Lattice) size=$(site)  Δt=$(Δt)  Θ=$(Θrelax)+$(Θquench)  U=$(Hu1)--$(Hu2)  Initial=$Initial  BS=$(BatchSize)  $(Nt)*$(Ns)*$(size(K))")
 
+    binoms_sq = [Float64(binomial(Nb, k))^2 for k in 0:Nb]
+
     return Model_Para_(Nb, Lattice, Ht, Hu1, Hu2, site, Θrelax, Θquench,
         Ns, Nt, K, BatchSize, Δt, exp_αη_pos, exp_αη_neg, αη, γ,
-        Pt, HalfeK, eK, HalfeKinv, eKinv, nodes, samplers_dict)
+        Pt, HalfeK, eK, HalfeKinv, eKinv, nodes, samplers_vec, binoms_sq)
 end
 
 mutable struct UpdateBuffer_

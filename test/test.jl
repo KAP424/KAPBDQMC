@@ -9,8 +9,8 @@ using LinearAlgebra
 
     rng = MersenneTwister(1234)
 
-    model = Model_Para(Nb=9, Ht=1.0, Hu1=0.0, Hu2=3.8, Θrelax=0.4, Θquench=0.3, Lattice="HoneyComb120",
-        site=[3, 3], Δt=0.1, BatchSize=10, Initial="V")
+    model = Model_Para(nb=0.5, Ht=1.0, Hu1=2.0, Hu2=2.0, Θrelax=2.4, Θquench=0.0, Lattice="HoneyComb120",
+        site=[6, 6], Δt=0.1, BatchSize=10, Initial="V")
 
     s = Initial_s(model, rng)
     println((model.nodes))

@@ -5,15 +5,18 @@ function get_F!(Nb, PL, PR, F)
     F .*= Nb / nrm
 end
 
-function EE_cal(Nb, L1, L2, R1, R2, indexA, indexAbar)
-    ans = 0
-    a = dot(L1[indexAbar], R1[indexAbar]) * dot(L2[indexAbar], R2[indexAbar])
-    b = dot(L1[indexA], R2[indexA]) * dot(L2[indexA], R1[indexA])
+function EE_cal(binoms_sq, L1, L2, R1, R2, indexA, indexAbar)
+    Nb = length(binoms_sq) - 1
+    a = (dot(L1[indexAbar], R1[indexAbar]) * dot(L2[indexAbar], R2[indexAbar]) / dot(L1, R1) / dot(L2, R2))^Nb
+    b = dot(L1[indexA], R2[indexA]) * dot(L2[indexA], R1[indexA]) / dot(L1[indexAbar], R1[indexAbar]) / dot(L2[indexAbar], R2[indexAbar])
 
+    ans = 0
+    bk = 1
     for k in 0:Nb
-        ans += binomial(Nb, k)^2 * a^(Nb - k) * b^k
+        ans += binoms_sq[k+1] * bk
+        bk *= b
     end
-    return ans
+    return abs2(ans * a)
 end
 
 
