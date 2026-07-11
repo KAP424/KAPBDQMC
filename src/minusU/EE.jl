@@ -20,11 +20,9 @@ function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss
 
     G1.Ls[:, NN] .= model.Pt
     G2.Ls[:, NN] .= model.Pt
+    G1.Rs[:, 1] .= model.Pt
+    G2.Rs[:, 1] .= model.Pt
 
-    D .= model.exp_αη_pos[1, ss[1][:, 1]]
-    D_ .= model.exp_αη_pos[1, ss[2][:, 1]]
-    G1.Rs[:, 1] .= Diagonal(D) * model.eK * model.Pt
-    G2.Rs[:, 1] .= Diagonal(D_) * model.eK * model.Pt
 
     for idx in 1:NN-1
         BM_F!(tmpN, tmpNN, view(G1.BMs, :, :, idx), model, ss[1], idx)
@@ -35,11 +33,22 @@ function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss
         G2.Rs[:, idx+1] ./= norm(G2.Rs[:, idx+1])
     end
     for idx in NN-1:-1:1
-        mul!(G1.Ls[:, idx], view(G1.BMs, :, :, idx)', G1.Ls[:, idx+1])
-        mul!(G2.Ls[:, idx], view(G2.BMs, :, :, idx)', G2.Ls[:, idx+1])
+        mul!(view(G1.Ls, :, idx), view(G1.BMs, :, :, idx)', G1.Ls[:, idx+1])
+        mul!(view(G2.Ls, :, idx), view(G2.BMs, :, :, idx)', G2.Ls[:, idx+1])
         G1.Ls[:, idx] ./= norm(G1.Ls[:, idx])
         G2.Ls[:, idx] ./= norm(G2.Ls[:, idx])
     end
+
+    # #############################################################################
+    # @assert norm(model.eK - model.eK') < 1e-10
+    # for idx in 1:NN
+    #     Ltt1, Rtt1 = LRt(model.nodes[idx], model, ss[1])
+    #     Ltt2, Rtt2 = LRt(model.nodes[idx], model, ss[2])
+    #     errrr = [norm(Ltt1 - G1.Ls[:, idx]), norm(Rtt1 - G1.Rs[:, idx]),
+    #         norm(Ltt2 - G2.Ls[:, idx]), norm(Rtt2 - G2.Rs[:, idx])]
+    #     println("idx=$(idx)  errrr=$((errrr))")
+    # end
+    # #############################################################################
 
 
     G1.Bt0s[:, :, Θidx] .= I(Ns)
@@ -65,23 +74,30 @@ function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss
         G2.R0 .= G2.Rs[:, Θidx]
 
         for lt in 1:model.Nt
-            # UpdateEELayer!(lt < lθ, rng, view(ss[1], :, lt), view(ss[2], :, lt), lt, G1, G2, model, UPD)
+            D .= model.exp_αη_pos[lt, ss[1][:, lt]]
+            D_ .= model.exp_αη_pos[lt, ss[2][:, lt]]
+
+            WrapKV!(tmpN, model.eK, model.eKinv, D, G1.Rt, "Forward", "R")
+            WrapKV!(tmpN, model.eK, model.eKinv, D_, G2.Rt, "Forward", "R")
+            WrapKV!(tmpN, model.eK, model.eKinv, D, G1.Lt, "Forward", "L")
+            WrapKV!(tmpN, model.eK, model.eKinv, D_, G2.Lt, "Forward", "L")
+
+            UpdateEELayer!(lt < lθ, rng, view(ss[1], :, lt), view(ss[2], :, lt), lt, G1, G2, model, UPD)
 
             ##############################################################
-            ERROR = 1e-5
-            Ltt1, Rtt1 = LRt(lt, model, ss[1])
-            Ltt2, Rtt2 = LRt(lt, model, ss[2])
-            L001, R001 = LRt(lθ, model, ss[1])
-            L002, R002 = LRt(lθ, model, ss[2])
-            errrr = [norm(Ltt1 - G1.Lt / norm(G1.Lt)), norm(Rtt1 - G1.Rt / norm(G1.Rt)),
-                norm(Ltt2 - G2.Lt / norm(G2.Lt)), norm(Rtt2 - G2.Rt / norm(G2.Rt)),
-                norm(L001 - G1.L0 / norm(G1.L0)), norm(R001 - G1.R0 / norm(G1.R0)),
-                norm(L002 - G2.L0 / norm(G2.L0)), norm(R002 - G2.R0 / norm(G2.R0))]
-            # println("lt=$(lt)  errrr=$((errrr))")
-            if sum(errrr) > ERROR
-                println(lt, " Update error:  ", sum(errrr[1:2:end]), "  ", sum(errrr[2:2:end]))
-            end
-
+            # ERROR = 1e-5
+            # Ltt1, Rtt1 = LRt(lt, model, ss[1])
+            # Ltt2, Rtt2 = LRt(lt, model, ss[2])
+            # L001, R001 = LRt(lθ, model, ss[1])
+            # L002, R002 = LRt(lθ, model, ss[2])
+            # errrr = [norm(Ltt1 - G1.Lt / norm(G1.Lt)), norm(Rtt1 - G1.Rt / norm(G1.Rt)),
+            #     norm(Ltt2 - G2.Lt / norm(G2.Lt)), norm(Rtt2 - G2.Rt / norm(G2.Rt)),
+            #     norm(L001 - G1.L0 / norm(G1.L0)), norm(R001 - G1.R0 / norm(G1.R0)),
+            #     norm(L002 - G2.L0 / norm(G2.L0)), norm(R002 - G2.R0 / norm(G2.R0))]
+            # # println("lt=$(lt)  errrr=$((errrr))")
+            # if sum(errrr) > ERROR
+            #     println(lt, " Update error:  ", sum(errrr[1:2:end]), "  ", sum(errrr[2:2:end]))
+            # end
             ##############################################################
 
             tmpO += EE_cal(model.Nb, G1.L0, G2.L0, G1.R0, G2.R0, indexA, indexAbar)
@@ -109,31 +125,33 @@ function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss
                     for i in Θidx-1:-1:1
                         mul!(view(G1.Bt0s, :, :, i), view(G1.Bt0s, :, :, i + 1), view(G1.BMs, :, :, i))
                         mul!(view(G2.Bt0s, :, :, i), view(G2.Bt0s, :, :, i + 1), view(G2.BMs, :, :, i))
-                        # G1.Bt0s[:, :, i] = G1.Bt0s[:, :, i+1] * G1.BMs[:, :, i]
-                        # G2.Bt0s[:, :, i] = G2.Bt0s[:, :, i+1] * G2.BMs[:, :, i]
                     end
                 elseif idx > Θidx
                     # update Bt0s after Θidx_idx
                     mul!(view(G1.Bt0s, :, :, idx), view(G1.BMs, :, :, idx - 1), view(G1.Bt0s, :, :, idx - 1))
                     mul!(view(G2.Bt0s, :, :, idx), view(G2.BMs, :, :, idx - 1), view(G2.Bt0s, :, :, idx - 1))
-                    # G1.Bt0s[:, :, idx] = G1.BMs[:, :, idx-1] * G1.Bt0s[:, :, idx-1]
-                    # G2.Bt0s[:, :, idx] = G2.BMs[:, :, idx-1] * G2.Bt0s[:, :, idx-1]
                 end
-            else
-                @inbounds @simd for iii in 1:Ns
-                    @fastmath D[iii] = model.exp_αη_pos[lt, ss[1][iii, lt]]
-                    @fastmath D_[iii] = model.exp_αη_pos[lt, ss[2][iii, lt]]
-                end
-
-                WrapKV!(tmpN, model.eK, model.eKinv, D, G1.Lt, "Forward", "R")
-                WrapKV!(tmpN, model.eK, model.eKinv, D_, G2.Lt, "Forward", "R")
-                WrapKV!(tmpN, model.eK, model.eKinv, D, G1.Rt, "Forward", "L")
-                WrapKV!(tmpN, model.eK, model.eKinv, D_, G2.Rt, "Forward", "L")
             end
         end
-
+        println("inverse update")
         for lt in model.Nt:-1:1
             UpdateEELayer!(lt < lθ, rng, view(ss[1], :, lt), view(ss[2], :, lt), lt, G1, G2, model, UPD)
+
+            ##############################################################
+            # ERROR = 1e-5
+            # Ltt1, Rtt1 = LRt(lt, model, ss[1])
+            # Ltt2, Rtt2 = LRt(lt, model, ss[2])
+            # L001, R001 = LRt(lθ, model, ss[1])
+            # L002, R002 = LRt(lθ, model, ss[2])
+            # errrr = [norm(Ltt1 - G1.Lt / norm(G1.Lt)), norm(Rtt1 - G1.Rt / norm(G1.Rt)),
+            #     norm(Ltt2 - G2.Lt / norm(G2.Lt)), norm(Rtt2 - G2.Rt / norm(G2.Rt)),
+            #     norm(L001 - G1.L0 / norm(G1.L0)), norm(R001 - G1.R0 / norm(G1.R0)),
+            #     norm(L002 - G2.L0 / norm(G2.L0)), norm(R002 - G2.R0 / norm(G2.R0))]
+            # # println("lt=$(lt)  errrr=$((errrr))")
+            # if sum(errrr) > ERROR
+            #     println(lt, " Update error:  ", sum(errrr[1:2:end]), "  ", sum(errrr[2:2:end]))
+            # end
+            ##############################################################
 
             tmpO += EE_cal(model.Nb, G1.L0, G2.L0, G1.R0, G2.R0, indexA, indexAbar)
             counter += 1
@@ -145,9 +163,6 @@ function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss
 
                 mul!(view(G1.Ls, :, idx), view(G1.BMs, :, :, idx)', view(G1.Ls, :, idx + 1))
                 mul!(view(G2.Ls, :, idx), view(G2.BMs, :, :, idx)', view(G2.Ls, :, idx + 1))
-
-                # G1.Ls[:, idx] .= G1.BMs[:, :, idx] * G1.Ls[:, idx+1]
-                # G2.Ls[:, idx] .= G2.BMs[:, :, idx] * G2.Ls[:, idx+1]
 
                 G1.Lt .= G1.Ls[:, idx]
                 G1.Rt .= G1.Rs[:, idx]
@@ -191,6 +206,8 @@ function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss
         counter = 0
 
     end
+    println("EE_update done, time: ", (time_ns() - TTT) / 1e9, " s")
+    println("Acceptance rate: ", UPD.acc / (Sweeps * model.Nt * model.Ns) / 4)
 end
 
 function UpdateEELayer!(tless0, rng, s1, s2, lt, G1, G2, model, UPD)

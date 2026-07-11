@@ -13,7 +13,7 @@ using LinearAlgebra
         site=[3, 3], Δt=0.1, BatchSize=10, Initial="V")
 
     s = Initial_s(model, rng)
-    # println((model.nodes))
+    println((model.nodes))
 
     # s = phy_update(path, model, s, 10, true)
 
@@ -63,3 +63,4 @@ using LinearAlgebra
     # ss = ctrl_SCEEicr(path, model, indexA, indexB, 2, λ, Nλ, ss, true)
 
 end
+
