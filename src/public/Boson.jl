@@ -6,6 +6,7 @@ function get_F!(Nb, PL, PR, F)
 end
 
 function EE_cal(binoms_sq, L1, L2, R1, R2, indexA, indexAbar)
+    # println(norm(L1), norm(L2), norm(R1), norm(R2))
     Nb = length(binoms_sq) - 1
     a = (dot(L1[indexAbar], R1[indexAbar]) * dot(L2[indexAbar], R2[indexAbar]) / dot(L1, R1) / dot(L2, R2))^Nb
     b = dot(L1[indexA], R2[indexA]) * dot(L2[indexA], R1[indexA]) / dot(L1[indexAbar], R1[indexAbar]) / dot(L2[indexAbar], R2[indexAbar])
@@ -16,8 +17,16 @@ function EE_cal(binoms_sq, L1, L2, R1, R2, indexA, indexAbar)
         ans += binoms_sq[k+1] * bk
         bk *= b
     end
+    # println("EE_cal:  ", a, b, abs2(ans * a))
     return abs2(ans * a)
 end
+
+
+A = rand(10, 10)
+a = rand(10)
+
+a .+= 10 .* A[:, 1]
+
 
 
 # using LinearAlgebra

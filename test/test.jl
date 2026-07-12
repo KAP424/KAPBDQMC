@@ -5,7 +5,7 @@ using Random
 using LinearAlgebra
 
 @testset "KAPBDQMC.jl" begin
-    path = "test\\Free\\HC120"
+    path = "test"
 
     rng = MersenneTwister(1234)
 
@@ -13,8 +13,8 @@ using LinearAlgebra
         site=[6, 6], Δt=0.1, BatchSize=10, Initial="V")
 
     s = Initial_s(model, rng)
-    println((model.nodes))
-
+    # println((model.nodes))
+    # println(model.binoms_sq)
     # s = phy_update(path, model, s, 10, true)
 
 
@@ -63,4 +63,3 @@ using LinearAlgebra
     # ss = ctrl_SCEEicr(path, model, indexA, indexB, 2, λ, Nλ, ss, true)
 
 end
-

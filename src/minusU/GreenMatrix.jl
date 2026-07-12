@@ -26,11 +26,32 @@ function BM_F!(tmpN, tmpNN, BM, model, s::Array{UInt8,2}, idx::Int64)
 end
 
 
+function WrapB!(tmpNN, eK, eKinv, D, G, direction, tless0)
+    if direction == "Forward"
+        if tless0
+            # D is inversed!
+            mul!(tmpNN, G, eKinv)
+            mul!(G, tmpNN, Diagonal(D))
+        else
+            mul!(tmpNN, eK, G)
+            mul!(G, Diagonal(D), tmpNN)
+        end
+    elseif direction == "Backward"
+        if tless0
+            mul!(tmpNN, G, Diagonal(D))
+            mul!(G, tmpNN, eK)
+        else
+            # D is inversed!
+            mul!(tmpNN, Diagonal(D), G)
+            mul!(G, eKinv, tmpNN)
+        end
+    end
+end
+
 function WrapKV!(tmpN, eK, eKinv, D, G, direction, LR)
     if direction == "Forward"
         if LR == "L"
             mul!(tmpN, eKinv, G)
-            D .= 1 ./ D
             mul!(G, Diagonal(D), tmpN)
         elseif LR == "R"
             mul!(tmpN, eK, G)
@@ -44,7 +65,6 @@ function WrapKV!(tmpN, eK, eKinv, D, G, direction, LR)
             mul!(G, eK, tmpN)
         elseif LR == "R"
             mul!(tmpN, eKinv, G)
-            D .= 1 ./ D
             mul!(G, Diagonal(D), tmpN)
         else
             error("WrapKV! LR must be L or R")

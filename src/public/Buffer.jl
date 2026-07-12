@@ -1,8 +1,9 @@
 mutable struct PhyBuffer_{T<:Number}
-    PLs::Matrix{T}
-    PRs::Matrix{T}
+    Ls::Matrix{T}
+    Rs::Matrix{T}
     BM::Matrix{T}
-    F::Matrix{T}
+    Lt::Vector{T}
+    Rt::Vector{T}
 
     # temporaries
     tmpN::Vector{T}
