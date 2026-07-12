@@ -52,7 +52,38 @@ function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss
     for idx in 1:div(NN - 1, 2)
         mul!(view(G1.Bt0s, :, :, Θidx - idx), view(G1.Bt0s, :, :, Θidx - idx + 1), view(G1.BMs, :, :, Θidx - idx))
         mul!(view(G2.Bt0s, :, :, Θidx - idx), view(G2.Bt0s, :, :, Θidx - idx + 1), view(G2.BMs, :, :, Θidx - idx))
+        mul!(view(G1.Bt0s, :, :, Θidx + idx), view(G1.BMs, :, :, Θidx + idx - 1), view(G1.Bt0s, :, :, Θidx + idx - 1))
+        mul!(view(G2.Bt0s, :, :, Θidx + idx), view(G2.BMs, :, :, Θidx + idx - 1), view(G2.Bt0s, :, :, Θidx + idx - 1))
     end
+
+    # #############################################################################
+    L001, R001 = LRt(lθ, model, ss[1])
+    for idx in 1:NN
+        # println(idx)
+        Ltt1, Rtt1 = LRt(model.nodes[idx], model, ss[1])
+        Ltt2, Rtt2 = LRt(model.nodes[idx], model, ss[2])
+        if idx < Θidx
+            L0p1 = inv(G1.Bt0s[:, :, idx])' * Ltt1
+            R0p1 = G1.Bt0s[:, :, idx] * Rtt1
+            L0p1 /= norm(L0p1)
+            R0p1 /= norm(R0p1)
+        else
+            L0p1 = G1.Bt0s[:, :, idx]' * Ltt1
+            R0p1 = inv(G1.Bt0s[:, :, idx]) * Rtt1
+            L0p1 /= norm(L0p1)
+            R0p1 /= norm(R0p1)
+        end
+        errrr = [norm(Ltt1 - G1.Ls[:, idx]), norm(Rtt1 - G1.Rs[:, idx]),
+            norm(Ltt2 - G2.Ls[:, idx]), norm(Rtt2 - G2.Rs[:, idx]),
+            norm(L001 - L0p1), norm(R001 - R0p1),
+        ]
+        if sum(errrr) > 1e-6
+            println("idx=$(idx)  Θidx=$(Θidx)  errrr=$((errrr))")
+        end
+    end
+    # #############################################################################
+
+
 
     # ============ SWEEP LOOP ============
     idx = 1
@@ -70,6 +101,7 @@ function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss
         G2.Bt0 .= G2.Bt0s[:, :, 1]
 
         for lt in 1:model.Nt
+            print("-")
             D .= @view model.exp_αη_pos[lt, view(ss[1], :, lt)]
             D_ .= @view model.exp_αη_pos[lt, view(ss[2], :, lt)]
 
@@ -78,26 +110,18 @@ function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss
             WrapKV!(tmpN, model.eK, model.eKinv, D_, G2.Rt, "Forward", "R")
 
             # --- Propagate Bt0 per-step ---
-            if lt < lθ
+            if lt <= lθ
                 D .= 1 ./ D
                 D_ .= 1 ./ D_
-                WrapB!(tmpNN, model.eK, model.eKinv, D, G1.Bt0, "Forward", lt < lθ)
-                WrapB!(tmpNN, model.eK, model.eKinv, D_, G2.Bt0, "Forward", lt < lθ)
-            elseif lt == lθ
-                # At τ=θ transition: B(θ,θ) = I in both conventions
-                fill!(G1.Bt0, 0)
-                fill!(G2.Bt0, 0)
-                for j in diagind(G1.Bt0)
-                    G1.Bt0[j] = 1.0
-                end
-                for j in diagind(G2.Bt0)
-                    G2.Bt0[j] = 1.0
-                end
-                D .= 1 ./ D
-                D_ .= 1 ./ D_
+                WrapB!(tmpNN, model.eK, model.eKinv, D, G1.Bt0, "Forward", lt <= lθ)
+                WrapB!(tmpNN, model.eK, model.eKinv, D_, G2.Bt0, "Forward", lt <= lθ)
+                # elseif lt == lθ
+                #     # At τ=θ transition: B(θ,θ) = I in both conventions
+                #     D .= 1 ./ D
+                #     D_ .= 1 ./ D_
             else
-                WrapB!(tmpNN, model.eK, model.eKinv, D, G1.Bt0, "Forward", lt < lθ)
-                WrapB!(tmpNN, model.eK, model.eKinv, D_, G2.Bt0, "Forward", lt < lθ)
+                WrapB!(tmpNN, model.eK, model.eKinv, D, G1.Bt0, "Forward", lt <= lθ)
+                WrapB!(tmpNN, model.eK, model.eKinv, D_, G2.Bt0, "Forward", lt <= lθ)
                 D .= 1 ./ D
                 D_ .= 1 ./ D_
             end
@@ -106,13 +130,22 @@ function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss
             WrapKV!(tmpN, model.eK, model.eKinv, D, G1.Lt, "Forward", "L")
             WrapKV!(tmpN, model.eK, model.eKinv, D_, G2.Lt, "Forward", "L")
 
-            # --- Update HS field ---
-            if lt == lθ
-                UpdateEELayerTheta!(rng, view(ss[1], :, lt), view(ss[2], :, lt), lt, G1, G2, model, UPD, tmpN, tmpNN)
-            else
-                UpdateEELayer!(lt < lθ, rng, view(ss[1], :, lt), view(ss[2], :, lt), lt, G1, G2, model, UPD, tmpN, tmpNN)
-            end
 
+            # #############################################################################
+            if lt <= lθ
+                mul!(tmpN, G1.Bt0, G1.Rt)
+                @assert norm(tmpN / norm(tmpN) - G1.R0 / norm(G1.R0)) < 1e-6 "lt=$(lt)"
+            end
+            # #############################################################################
+
+            # --- Update HS field ---
+            # if lt == lθ
+            #     UpdateEELayerTheta!(rng, view(ss[1], :, lt), view(ss[2], :, lt), lt, G1, G2, model, UPD, tmpN, tmpNN)
+            # else
+            UpdateEELayer!(lt <= lθ, rng, view(ss[1], :, lt), view(ss[2], :, lt), lt, G1, G2, model, UPD, tmpN, tmpNN)
+            # end
+
+            # #############################################################################
             # ========== VERIFICATION ==========
             ERROR = 5e-4
             Ltt1, Rtt1 = LRt(lt, model, ss[1])
@@ -126,6 +159,7 @@ function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss
             if !(maximum(errrr) < ERROR)
                 error("lt=", lt, " lθ=", lθ, " Update error:  ", errrr)
             end
+            # #############################################################################
 
             tmpO += EE_cal(model.binoms_sq, G1.L0, G2.L0, G1.R0, G2.R0, indexA, indexAbar)
             counter += 1
@@ -179,7 +213,7 @@ function EE_update(path::String, model, indexA::Vector{Int64}, Sweeps::Int64, ss
     println("      acc = ", round(100 * UPD.acc / prod(size(ss[1])) / Sweeps / 4, digits=2), "%", "  $(Sweeps) Sweep finished in ", string(lpad(string(hour), 2, '0'), ":", lpad(string(minite), 2, '0'), ":", lpad(string(second), 2, '0')))
 end
 
-function UpdateEELayer!(tless0, rng, s1, s2, lt, G1, G2, model, UPD, tmpN, tmpNN)
+function UpdateEELayer!(tleq0, rng, s1, s2, lt, G1, G2, model, UPD, tmpN, tmpNN)
     LR1 = dot(G1.Lt, G1.Rt)
     LR2 = dot(G2.Lt, G2.Rt)
 
@@ -191,12 +225,19 @@ function UpdateEELayer!(tless0, rng, s1, s2, lt, G1, G2, model, UPD, tmpN, tmpNN
             p = UPD.r * model.γ[sx] / model.γ[s1[i]]
 
             if rand(rng) < p
+                print("*")
                 s1[i] = sx
                 UPD.acc += 1
-                if tless0
+                if tleq0
+                    mul!(tmpN, G1.Bt0, G1.Rt)
+                    @assert norm(tmpN / norm(tmpN) - G1.R0 / norm(G1.R0)) < 1e-6 "update Bt0 Rt ≠ R0"
+                    
                     mul!(tmpN, G1.Bt0, G1.Rt)
                     axpy!(UPD.Δ * G1.Rt[i], G1.Bt0[:, i], tmpN)
                     G1.R0 .= tmpN / norm(tmpN)
+                    
+                    # G1.R0 .+= UPD.Δ * G1.Rt[i] * G1.Bt0[:, i]
+                    # G1.R0 ./= norm(G1.R0)
                 else
                     mul!(tmpN, G1.Bt0', G1.Lt)
                     axpy!(UPD.Δ * G1.Lt[i], conj.(G1.Bt0[i, :]), tmpN)
@@ -216,10 +257,12 @@ function UpdateEELayer!(tless0, rng, s1, s2, lt, G1, G2, model, UPD, tmpN, tmpNN
             if rand(rng) < p
                 s2[i] = sx
                 UPD.acc += 1
-                if tless0
+                if tleq0
                     mul!(tmpN, G2.Bt0, G2.Rt)
                     axpy!(UPD.Δ * G2.Rt[i], G2.Bt0[:, i], tmpN)
                     G2.R0 .= tmpN / norm(tmpN)
+                    # G2.R0 .+= UPD.Δ * G2.Rt[i] .* G2.Bt0[:, i]
+                    # G2.R0 ./= norm(G2.R0)
                 else
                     mul!(tmpN, G2.Bt0', G2.Lt)
                     axpy!(UPD.Δ * G2.Lt[i], conj.(G2.Bt0[i, :]), tmpN)

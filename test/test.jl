@@ -9,8 +9,9 @@ using LinearAlgebra
 
     rng = MersenneTwister(2)
 
-    model = Model_Para(nb=0.5, Ht=1.0, Hu1=2.0, Hu2=2.0, Θrelax=2.4, Θquench=0.0, Lattice="HoneyComb120",
-        site=[6, 6], Δt=0.1, BatchSize=5, Initial="V")
+    model = Model_Para(nb=0.5, Ht=1.0, Hu1=1.0, Hu2=1.0,
+        Θrelax=0.6, Θquench=0.0, Lattice="HoneyComb120",
+        site=[6, 6], Δt=0.05, BatchSize=5, Initial="V")
 
     s = Initial_s(model, rng)
     println((model.nodes))
@@ -63,3 +64,10 @@ using LinearAlgebra
     # ss = ctrl_SCEEicr(path, model, indexA, indexB, 2, λ, Nλ, ss, true)
 
 end
+
+using LinearAlgebra
+A = I(10)
+
+a = ones(10)
+
+a .-= 2 .* A[:, 1]
