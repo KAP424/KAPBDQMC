@@ -7,13 +7,13 @@ using LinearAlgebra
 @testset "KAPBDQMC.jl" begin
     path = "test"
 
-    rng = MersenneTwister(1234)
+    rng = MersenneTwister(2)
 
     model = Model_Para(nb=0.5, Ht=1.0, Hu1=2.0, Hu2=2.0, Θrelax=2.4, Θquench=0.0, Lattice="HoneyComb120",
-        site=[6, 6], Δt=0.1, BatchSize=10, Initial="V")
+        site=[6, 6], Δt=0.1, BatchSize=5, Initial="V")
 
     s = Initial_s(model, rng)
-    # println((model.nodes))
+    println((model.nodes))
     # println(model.binoms_sq)
     # s = phy_update(path, model, s, 10, true)
 
