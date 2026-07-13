@@ -95,7 +95,6 @@ function Model_Para(; nb, Ht, Hu1, Hu2, Δt, Θrelax, Θquench, Lattice::String,
         Ns, Nt, K, BatchSize, Δt, exp_αη_pos, exp_αη_neg, αη, γ,
         Pt, HalfeK, eK, HalfeKinv, eKinv, nodes, samplers_vec, binoms_sq)
 end
-
 mutable struct UpdateBuffer_
     acc::Int64
     Δ::Float64
@@ -117,31 +116,13 @@ function PhyBuffer(Ns, NN)
         Matrix{Float64}(undef, Ns, NN),
         Matrix{Float64}(undef, Ns, NN),
         Matrix{Float64}(undef, Ns, Ns),
-        Matrix{Float64}(undef, Ns, Ns),
-        Vector{Float64}(undef, Ns),
-        Matrix{Float64}(undef, Ns, Ns)
-    )
-end
-
-function G4Buffer(Ns, NN)
-    return G4Buffer_{Float64}(
-        Array{Float64}(undef, Ns, Ns, NN - 1),
         Vector{Float64}(undef, Ns),
         Vector{Float64}(undef, Ns),
         Vector{Float64}(undef, Ns),
-        Vector{Float64}(undef, Ns),
-        Matrix{Float64}(undef, Ns, Ns),
-        Matrix{Float64}(undef, Ns, NN),
-        Matrix{Float64}(undef, Ns, NN),
-        Array{Float64}(undef, Ns, Ns, NN),
-    )
-end
-
-function SCEEBuffer(Ns)
-    return SCEEBuffer_{Float64}(
         Vector{Float64}(undef, Ns),
         Vector{Float64}(undef, Ns),
         Vector{Float64}(undef, Ns),
         Matrix{Float64}(undef, Ns, Ns)
     )
 end
+

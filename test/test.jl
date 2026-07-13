@@ -9,20 +9,22 @@ using LinearAlgebra
 
     rng = MersenneTwister(2)
 
-    model = Model_Para(nb=0.5, Ht=1.0, Hu1=1.0, Hu2=1.0,
+    model = Model_Para(nb=0.5, Ht=1.0, Hu1=0.0, Hu2=0.0,
         Θrelax=0.6, Θquench=0.0, Lattice="HoneyComb120",
         site=[6, 6], Δt=0.05, BatchSize=5, Initial="V")
-
-    s = Initial_s(model, rng)
-    println((model.nodes))
-    # println(model.binoms_sq)
-    # s = phy_update(path, model, s, 10, true)
-
 
     L = model.site[2]
     indexA = area_index(model.Lattice, model.site, ([1, 1], [div(L, 3), L]))
 
-    EE_update(path, model, indexA, 1, [copy(s), copy(s)], true)
+    println("Free EE=", Free_EE(model.Lattice, model.site, indexA, model.Nb))
+
+    s = Initial_s(model, rng)
+    println((model.nodes))
+    # println(model.binoms_sq)
+    s = phy_update(path, model, s, 10, false)
+
+
+    EE_update(path, model, indexA, 50, [copy(s), copy(s)], true)
 
     # λ = 0.5
     # Nλ = 2
@@ -64,10 +66,3 @@ using LinearAlgebra
     # ss = ctrl_SCEEicr(path, model, indexA, indexB, 2, λ, Nλ, ss, true)
 
 end
-
-using LinearAlgebra
-A = I(10)
-
-a = ones(10)
-
-a .-= 2 .* A[:, 1]

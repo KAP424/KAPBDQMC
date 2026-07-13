@@ -1,8 +1,6 @@
 # 一维，半系统纠缠熵在固定系统大小，变化boson数的纠缠熵变化
 
-# 还需要考察非半系统的情况
 
-include("C:\\Users\\22423\\Desktop\\KAPDQMC\\code\\KAPBDQMC\\src\\public\\Boson.jl")
 include("C:\\Users\\22423\\Desktop\\KAPDQMC\\code\\KAPBDQMC\\src\\public\\Geometry.jl")
 using LinearAlgebra, LinearAlgebra.BLAS, LinearAlgebra.LAPACK
 using Plots
@@ -58,7 +56,20 @@ for nb in nb_set
             legend=true, label="nb=$nb area=$LEE", lw=2)
     end
 end
+
+L_set, EE_set = EEvsL_hc(0.5, "half")
+X = log.(L_set)
+Y = EE_set
+# 构建矩阵 [X 1]
+A = hcat(X, ones(length(X)))
+# 求解最小二乘：A * [a; b] ≈ Y
+coeffs = inv(A' * A) * (A' * Y)
+a = Float64(coeffs[1])
+b = Float64(coeffs[2])
+y = a * log.(L_set) .+ b .- 0.6
+
+plot!(L_set, y, label="ln Fit: y=$(round(a; digits=3)) lnx + $(round(b; digits=3))",
+    lw=2, color=:black)
+
 display(p)
-
-
 savefig("test\\Free\\HC120\\EE_vs_L.png")

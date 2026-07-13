@@ -1,4 +1,3 @@
-include("C:\\Users\\22423\\Desktop\\KAPDQMC\\code\\KAPBDQMC\\src\\public\\Boson.jl")
 include("C:\\Users\\22423\\Desktop\\KAPDQMC\\code\\KAPBDQMC\\src\\public\\Geometry.jl")
 using LinearAlgebra, LinearAlgebra.BLAS, LinearAlgebra.LAPACK
 using Plots

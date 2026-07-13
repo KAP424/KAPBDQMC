@@ -2,7 +2,6 @@
 
 # 还需要考察非半系统的情况
 
-include("C:\\Users\\22423\\Desktop\\KAPDQMC\\code\\KAPBDQMC\\src\\public\\Boson.jl")
 include("C:\\Users\\22423\\Desktop\\KAPDQMC\\code\\KAPBDQMC\\src\\public\\Geometry.jl")
 using LinearAlgebra, LinearAlgebra.BLAS, LinearAlgebra.LAPACK
 using Plots, Random
@@ -47,7 +46,7 @@ function EEvsL_area_hc(nb)
     return L_set, EE_set
 end
 
-nb_set = [1//3, 1//2, 1//1]
+nb_set = [1 // 3, 1 // 2, 1 // 1]
 
 p = plot(legend=:outerright)
 
@@ -74,4 +73,4 @@ for nb in nb_set
 end
 display(p)
 
-savefig("test\\Free\\HC120\\EE_vs_area.png")
+savefig("test\\Free\\HC120\\EE_vsL_area.png")
